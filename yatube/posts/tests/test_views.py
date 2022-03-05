@@ -41,9 +41,12 @@ class UserViewTest(TestCase):
             group=cls.group,
             image=uploaded,
         )
+        cls.user_1 = User.objects.create_user(username='username_1')
         cls.guest_client = Client()
         cls.authorized_client = Client()
+        cls.authorized_client_1 = Client()
         cls.authorized_client.force_login(cls.user)
+        cls.authorized_client_1.force_login(cls.user_1)
 
     def test_pages_uses_correct_template(self):
         """URL-адрес использует соответствующий шаблон."""
@@ -86,13 +89,10 @@ class UserViewTest(TestCase):
         response_one = self.guest_client.get(reverse('posts:main_page'))
         response_one_obj_content = response_one.content
         response_one.context['page_obj'][0].delete()
-        form_data = {
-            'text': 'Тестовый пост для проверки кэширования',
-        }
-        self.authorized_client.post(
-            reverse('posts:post_create'),
-            data=form_data,
-            follow=True
+        Post.objects.create(
+            text='text',
+            author=self.user,
+            group=self.group
         )
         response_two = self.guest_client.get(reverse('posts:main_page'))
         response_two_obj_content = response_two.content
@@ -270,50 +270,63 @@ class UserViewTest(TestCase):
 
     def test_authorized_client_can_follow(self):
         """Проверка, что авторизованный пользователь может подписываться на
-        других пользователей и удалять их из подписок.
+        других пользователей.
         """
-        user = User.objects.create_user(username='username_1')
-        authorized_client = Client()
-        authorized_client.force_login(user)
-        response_auth_1 = authorized_client.get(
+        self.authorized_client_1.get(
             reverse('posts:profile_follow', args={self.post.author.username})
         )
-        response_auth_2 = authorized_client.get(
+        response = self.authorized_client_1.get(
+            reverse('posts:follow_index')
+        )
+        self.assertContains(response, self.post.text)
+
+    def test_authorized_client_can_unfollow(self):
+        """Проверка, что авторизованный пользователь может отписываться
+        от других пользователей.
+        """
+        self.authorized_client_1.get(
+            reverse('posts:profile_follow', args={self.post.author.username})
+        )
+        self.authorized_client_1.get(
+            reverse('posts:profile_follow', args={self.post.author.username})
+        )
+        self.authorized_client_1.get(
             reverse('posts:profile_unfollow', args={self.post.author.username})
         )
+        response = self.authorized_client_1.get(
+            reverse('posts:follow_index')
+        )
+        self.assertNotContains(response, self.post.text)
+
+    def test_not_authorized_client_can_not_follow(self):
+        """Неавторизованный пользователь не может подписаться на автора."""
         response_not_auth = self.guest_client.get(
             reverse('posts:profile_follow', args={self.post.author.username})
         )
-        redirect_auth = reverse(
-            'posts:profile', args={self.post.author.username}
-        )
         redirect_not_auth = \
             f'/auth/login/?next=/profile/{self.post.author.username}/follow/'
-        self.assertRedirects(response_auth_1, redirect_auth)
-        self.assertRedirects(response_auth_2, redirect_auth)
         self.assertRedirects(response_not_auth, redirect_not_auth)
 
     def test_new_post_is_on_the_follow_index_page(self):
         """Новая запись пользователя появляется в ленте тех,
-        кто на него подписан и не появляется в ленте тех, кто не подписан.
+        кто на него подписан.
         """
-        user_1 = User.objects.create_user(username='username_2')
-        user_2 = User.objects.create_user(username='username_3')
-        authorized_client_1 = Client()
-        authorized_client_2 = Client()
-        authorized_client_1.force_login(user_1)
-        authorized_client_2.force_login(user_2)
-        authorized_client_1.post(
+        self.authorized_client_1.get(
             reverse('posts:profile_follow', args={self.post.author.username})
         )
-        response_user_1 = authorized_client_1.get(
+        response_user = self.authorized_client_1.get(
             reverse('posts:follow_index')
         )
-        response_user_2 = authorized_client_2.get(
+        self.assertContains(response_user, self.post.text)
+
+    def test_new_post_is_not_on_the_follow_index_page(self):
+        """Новая запись пользователя не появляется в ленте тех,
+        кто на него не подписан.
+        """
+        response_user = self.authorized_client_1.get(
             reverse('posts:follow_index')
         )
-        self.assertContains(response_user_1, self.post.text)
-        self.assertNotContains(response_user_2, self.post.text)
+        self.assertNotContains(response_user, self.post.text)
 
     def test_client_can_not_follow_himself(self):
         """Пользователь не может подписаться на сосамого себя"""

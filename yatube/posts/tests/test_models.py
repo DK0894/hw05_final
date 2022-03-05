@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from ..models import Comment, Group, Post
+from ..models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
@@ -26,6 +26,10 @@ class UserModelTest(TestCase):
         cls.comment = Comment.objects.create(
             text='test_text_text_text',
             author=User.objects.create_user(username='T1000')
+        )
+        cls.follow = Follow.objects.create(
+            user=cls.comment.author,
+            author=cls.post.author
         )
 
     def test_models_correct_object_names_post(self):
