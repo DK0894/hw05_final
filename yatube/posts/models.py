@@ -110,4 +110,4 @@ class Follow(models.Model):
     ]
 
     def __str__(self):
-        return f'User follows Author'
+        return f'{"User follows Author"}'
