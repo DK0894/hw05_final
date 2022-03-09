@@ -32,13 +32,14 @@ def profile(request, username):
     following = False
     # Здесь код запроса к модели и создание словаря контекста
     author = get_object_or_404(User, username=username)
-    post_list = Post.objects.filter(author=author)
+    post_list = author.posts.filter(author=author)
     post_count = author.posts.count()
     page_obj = get_paginator(post_list, request)
     # Проверки, подписан ли пользователь на автора
     if request.user.is_authenticated:
-        if Follow.objects.filter(user=request.user, author=author).count():
-            following = True
+        following = request.user.is_authenticated and Follow.objects.filter(
+            user=request.user, author=author
+        ).exists()
     context = {
         'page_obj': page_obj,
         'author': author,

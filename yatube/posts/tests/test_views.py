@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Group, Post
+from ..models import Follow, Group, Post
 
 User = get_user_model()
 
@@ -33,8 +33,7 @@ class UserViewTest(TestCase):
             slug='test_slug',
             description='test_description',
         )
-        cls.user = User.objects.create_user(
-            username='Test_username')
+        cls.user = User.objects.create_user(username='Test_username')
         cls.post = Post.objects.create(
             text='test_text',
             author=User.objects.get(username='Test_username'),
@@ -247,7 +246,7 @@ class UserViewTest(TestCase):
         group_1 = Group.objects.create(
             title='test_group_1',
             slug='test_slug_1',
-            description='test_description_!',
+            description='test_description_1',
         )
         response_2 = self.authorized_client.get(
             reverse('posts:group_list', args={group_1.slug})
@@ -272,31 +271,36 @@ class UserViewTest(TestCase):
         """Проверка, что авторизованный пользователь может подписываться на
         других пользователей.
         """
-        self.authorized_client_1.get(
-            reverse('posts:profile_follow', args={self.post.author.username})
-        )
-        response = self.authorized_client_1.get(
+        response_1 = self.authorized_client_1.get(
             reverse('posts:follow_index')
         )
-        self.assertContains(response, self.post.text)
+        self.assertNotContains(response_1, self.post.text)
+        Follow.objects.create(
+            user=self.user_1,
+            author=self.user,
+        )
+        response_2 = self.authorized_client_1.get(
+            reverse('posts:follow_index')
+        )
+        self.assertContains(response_2, self.post.text)
 
     def test_authorized_client_can_unfollow(self):
         """Проверка, что авторизованный пользователь может отписываться
         от других пользователей.
         """
-        self.authorized_client_1.get(
-            reverse('posts:profile_follow', args={self.post.author.username})
-        )
-        self.authorized_client_1.get(
-            reverse('posts:profile_follow', args={self.post.author.username})
+        Follow.objects.create(
+            user=self.user_1,
+            author=self.user,
         )
         self.authorized_client_1.get(
             reverse('posts:profile_unfollow', args={self.post.author.username})
         )
-        response = self.authorized_client_1.get(
-            reverse('posts:follow_index')
+        self.assertFalse(
+            Follow.objects.filter(
+                user=self.user_1,
+                author=self.user,
+            ).exists()
         )
-        self.assertNotContains(response, self.post.text)
 
     def test_not_authorized_client_can_not_follow(self):
         """Неавторизованный пользователь не может подписаться на автора."""
@@ -334,3 +338,19 @@ class UserViewTest(TestCase):
             reverse('posts:profile_follow', args={self.post.author.username})
         )
         self.assertRedirects(response, reverse('posts:main_page'))
+
+    def test_client_can_not_follow_two_times(self):
+        """Пользователь не может два раза подписаться на одного автора"""
+        Follow.objects.create(
+            user=self.user_1,
+            author=self.user,
+        )
+        self.authorized_client_1.get(
+            reverse('posts:profile_follow', args={self.post.author.username})
+        )
+        self.assertEqual(
+            len(Follow.objects.filter(
+                user=self.user_1,
+                author=self.user,
+            )), 1
+        )
