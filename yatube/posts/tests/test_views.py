@@ -271,18 +271,21 @@ class UserViewTest(TestCase):
         """Проверка, что авторизованный пользователь может подписываться на
         других пользователей.
         """
-        response_1 = self.authorized_client_1.get(
-            reverse('posts:follow_index')
+        self.assertFalse(
+            Follow.objects.filter(
+                user=self.user_1,
+                author=self.user,
+            ).exists()
         )
-        self.assertNotContains(response_1, self.post.text)
-        Follow.objects.create(
-            user=self.user_1,
-            author=self.user,
+        self.authorized_client_1.get(
+            reverse('posts:profile_follow', args={self.post.author.username})
         )
-        response_2 = self.authorized_client_1.get(
-            reverse('posts:follow_index')
+        self.assertTrue(
+            Follow.objects.filter(
+                user=self.user_1,
+                author=self.user,
+            ).exists()
         )
-        self.assertContains(response_2, self.post.text)
 
     def test_authorized_client_can_unfollow(self):
         """Проверка, что авторизованный пользователь может отписываться
@@ -349,8 +352,8 @@ class UserViewTest(TestCase):
             reverse('posts:profile_follow', args={self.post.author.username})
         )
         self.assertEqual(
-            len(Follow.objects.filter(
+            Follow.objects.filter(
                 user=self.user_1,
                 author=self.user,
-            )), 1
+            ).count(), 1
         )

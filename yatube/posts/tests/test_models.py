@@ -50,9 +50,8 @@ class UserModelTest(TestCase):
 
     def test_models_correct_object_names_follow(self):
         """Проверяем, что у модели Follow корректно работает __str__."""
-        obj_name = f'{self.comment.author} follows {self.post.author}'
         expected_obj_name = f'{self.follow.user} follows {self.follow.author}'
-        self.assertEqual(obj_name, expected_obj_name)
+        self.assertEqual(str(self.follow), expected_obj_name)
 
     def test_verbose_name(self):
         """verbose_name в полях совпадает с ожидаемым."""
